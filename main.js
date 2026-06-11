@@ -116,7 +116,7 @@ function setupThree() {
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't look below floor
   controls.minDistance = 1.0;
-  controls.maxDistance = 7.0; // limit zoom out
+  controls.maxDistance = 5.5; // limit zoom out so camera doesn't go too far
   controls.enablePan = false; // block panning out of room
   controls.enabled = false;
 
@@ -413,7 +413,9 @@ function applyTextureToCanvas(mesh, texture) {
 function buildCatalogUI() {
   dom.catalogCarousel.innerHTML = '';
   dom.swapGrid.innerHTML = '';
-  dom.panelSwapStrip.innerHTML = '';
+  if (dom.panelSwapStrip) {
+    dom.panelSwapStrip.innerHTML = '';
+  }
 
   artworks.forEach(art => {
     // 1. Bottom Catalog Carousel Item
@@ -439,14 +441,16 @@ function buildCatalogUI() {
     });
     dom.swapGrid.appendChild(swapThumb);
 
-    // 3. Inline Panel Strip Thumb
-    const panelThumb = document.createElement('div');
-    panelThumb.className = 'panel-swap-thumb';
-    panelThumb.dataset.id = art.id;
-    panelThumb.title = art.title;
-    panelThumb.innerHTML = `<img src="/${art.filename}" alt="${art.title}" />`;
-    panelThumb.addEventListener('click', () => swapActiveFrameArtwork(art.id));
-    dom.panelSwapStrip.appendChild(panelThumb);
+    // 3. Inline Panel Strip Thumb (if exists)
+    if (dom.panelSwapStrip) {
+      const panelThumb = document.createElement('div');
+      panelThumb.className = 'panel-swap-thumb';
+      panelThumb.dataset.id = art.id;
+      panelThumb.title = art.title;
+      panelThumb.innerHTML = `<img src="/${art.filename}" alt="${art.title}" />`;
+      panelThumb.addEventListener('click', () => swapActiveFrameArtwork(art.id));
+      dom.panelSwapStrip.appendChild(panelThumb);
+    }
   });
 }
 
@@ -762,6 +766,14 @@ function setupUIEventListeners() {
   dom.ctxCloseBtn.addEventListener('click', () => {
     dom.frameContextMenu.classList.add('hidden');
   });
+
+  // Swipe/Drag gesture listeners for Inspect Mode
+  window.addEventListener('mousedown', onSwipeMouseDown, { passive: false });
+  window.addEventListener('mousemove', onSwipeMouseMove, { passive: false });
+  window.addEventListener('mouseup', onSwipeMouseUp, { passive: false });
+  window.addEventListener('touchstart', onSwipeMouseDown, { passive: true });
+  window.addEventListener('touchmove', onSwipeMouseMove, { passive: true });
+  window.addEventListener('touchend', onSwipeMouseUp, { passive: true });
 }
 
 // RIGHT-CLICK CONTEXT MENU ON FRAME
@@ -848,6 +860,14 @@ function onCanvasClick(event) {
 function onCanvasHover(event) {
   if (!state.entered) return;
 
+  // If in inspect mode, show grab/grabbing cursor for swipe gestures
+  if (state.activeMode === 'inspect') {
+    if (!isSwipeDragging) {
+      document.body.style.cursor = 'grab';
+    }
+    return;
+  }
+
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -860,6 +880,73 @@ function onCanvasHover(event) {
     document.body.style.cursor = 'pointer';
   } else {
     document.body.style.cursor = 'default';
+  }
+}
+
+// SWIPE/DRAG TO SWAP ARTWORK IN INSPECT MODE
+let swipeStartX = 0;
+let swipeStartY = 0;
+let isSwipeDragging = false;
+let swipeDiffX = 0;
+
+function onSwipeMouseDown(event) {
+  if (state.activeMode !== 'inspect') return;
+  
+  // Ignore clicks on UI buttons/panels
+  if (event.target.closest('.ui-container') || event.target.closest('.overlay') || event.target.tagName === 'BUTTON') {
+    isSwipeDragging = false;
+    return;
+  }
+
+  // Only handle left click
+  if (event.type === 'mousedown' && event.button !== 0) return;
+
+  const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+  const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
+  swipeStartX = clientX;
+  swipeStartY = clientY;
+  isSwipeDragging = true;
+  swipeDiffX = 0;
+
+  document.body.style.cursor = 'grabbing';
+}
+
+function onSwipeMouseMove(event) {
+  if (!isSwipeDragging || state.activeMode !== 'inspect') return;
+
+  const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+  swipeDiffX = clientX - swipeStartX;
+
+  document.body.style.cursor = 'grabbing';
+}
+
+function onSwipeMouseUp(event) {
+  if (!isSwipeDragging || state.activeMode !== 'inspect') return;
+  isSwipeDragging = false;
+  document.body.style.cursor = 'grab';
+
+  const threshold = 60; // minimum pixels to trigger swipe
+  if (Math.abs(swipeDiffX) > threshold) {
+    // Find currently inspected canvas
+    if (!state.selectedFrame) return;
+    const currentFrame = state.selectedFrame.name;
+    const currentArt = artworks.find(a => a.frame === currentFrame);
+    if (!currentArt) return;
+
+    // Find current index in artworks list
+    const currentIndex = artworks.findIndex(a => a.id === currentArt.id);
+    let newIndex;
+    if (swipeDiffX < 0) {
+      // Swiped left (dragged left) -> Show NEXT artwork
+      newIndex = (currentIndex + 1) % artworks.length;
+    } else {
+      // Swiped right (dragged right) -> Show PREVIOUS artwork
+      newIndex = (currentIndex - 1 + artworks.length) % artworks.length;
+    }
+
+    const newArt = artworks[newIndex];
+    swapActiveFrameArtwork(newArt.id);
   }
 }
 
@@ -898,6 +985,21 @@ function animate() {
   } else {
     // Sync targets in case orbit controls are working
     controls.update();
+
+    if (state.entered) {
+      // Clamp camera position inside room boundaries to prevent going outside walls/floor/ceiling
+      const minX = -3.8;
+      const maxX = 3.8;
+      const minY = 1.0;
+      const maxY = 2.4;
+      const minZ = -5.8;
+      const maxZ = 5.8;
+
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, minX, maxX);
+      camera.position.y = THREE.MathUtils.clamp(camera.position.y, minY, maxY);
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, minZ, maxZ);
+    }
+
     state.cameraTargetPos.copy(camera.position);
     state.cameraLookAtTarget.copy(controls.target);
     state.currentLookAt.copy(controls.target);
