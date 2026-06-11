@@ -359,17 +359,53 @@ function setupModelObjects() {
         });
       }
 
-      // Handle sculpture and metal frames
-      if (child.name.startsWith('Frame_') || child.name === 'Sculpture' || child.name.includes('Handle')) {
+      // Handle Floor material (reflective parquetry wood)
+      if (child.name === 'Floor') {
         child.material = new THREE.MeshStandardMaterial({
-          color: 0x1f1f23, // Charcoal frame for modern contrast
-          roughness: 0.3,
-          metalness: 0.5
+          color: 0x543d2b, // warm rich oak parquetry wood tone
+          roughness: 0.18, // highly polished/reflective surface
+          metalness: 0.1
         });
-        if (child.name === 'Sculpture') {
-          child.material.color.setHex(0xdfa94b); // Golden sculpture!
-          child.material.metalness = 0.9;
-          child.material.roughness = 0.15;
+      }
+
+      // Handle Walls material
+      if (child.name.startsWith('Wall')) {
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0xf7f7f9, // bright clean plaster wall
+          roughness: 0.85,
+          metalness: 0.0
+        });
+      }
+
+      // Handle Baseboards (gilded gold trim for royal aesthetic)
+      if (child.name.startsWith('Baseboard')) {
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0xdfa94b, // Golden bronze
+          roughness: 0.2,
+          metalness: 0.8
+        });
+      }
+
+      // Handle sculpture, handles, and wooden picture frames
+      if (child.name.startsWith('Frame_') || child.name === 'Sculpture' || child.name.includes('Handle')) {
+        if (child.name.startsWith('Frame_')) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0x3d2314, // Deep rich royal mahogany brown wood
+            roughness: 0.55,
+            metalness: 0.1
+          });
+        } else if (child.name === 'Sculpture') {
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0xdfa94b, // Shining gold sculpture
+            metalness: 0.9,
+            roughness: 0.15
+          });
+        } else {
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0x1d1d21, // Charcoal metal handles
+            roughness: 0.3,
+            metalness: 0.6
+          });
         }
       }
 
@@ -419,8 +455,181 @@ function setupModelObjects() {
     leftDoorHingeGroup.attach(leftDoorPanel);
   }
 
+  // Add 3D royal props to the showroom floor
+  addRoyalProps();
+
   // Build the catalog list in UI
   buildCatalogUI();
+}
+
+// CREATE AND POSITION DYNAMIC ROYAL PROPS IN THE SHOWROOM
+function addRoyalProps() {
+  // Clear any existing props group to prevent duplicates
+  const existingProps = scene.getObjectByName("royalProps");
+  if (existingProps) scene.remove(existingProps);
+
+  const propsGroup = new THREE.Group();
+  propsGroup.name = "royalProps";
+
+  // Royal Theme Materials
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xdfa94b, // Rich bronze gold
+    metalness: 0.9,
+    roughness: 0.15
+  });
+
+  const velvetMat = new THREE.MeshStandardMaterial({
+    color: 0x8b0012, // Deep royal crimson velvet
+    roughness: 0.85,
+    metalness: 0.05
+  });
+
+  const greenLeafMat = new THREE.MeshStandardMaterial({
+    color: 0x1d3a1f, // Rich palm leaf green
+    roughness: 0.65,
+    metalness: 0.05
+  });
+
+  // 1. ROYAL VELVET OTTOMAN SEATING BENCH (Placed in the middle of the room)
+  const benchGroup = new THREE.Group();
+  benchGroup.position.set(0, 0, 1.2);
+
+  // Velvet Cushion
+  const cushionGeom = new THREE.BoxGeometry(1.5, 0.18, 0.6);
+  const cushion = new THREE.Mesh(cushionGeom, velvetMat);
+  cushion.position.y = 0.44;
+  cushion.castShadow = true;
+  cushion.receiveShadow = true;
+  benchGroup.add(cushion);
+
+  // Gold Base frame
+  const frameGeom = new THREE.BoxGeometry(1.52, 0.03, 0.62);
+  const benchFrame = new THREE.Mesh(frameGeom, goldMat);
+  benchFrame.position.y = 0.35;
+  benchFrame.castShadow = true;
+  benchGroup.add(benchFrame);
+
+  // Legs (Angled cylinders)
+  const legGeom = new THREE.CylinderGeometry(0.02, 0.015, 0.35, 8);
+  const legOffsets = [
+    [-0.7, 0.175, -0.26],
+    [-0.7, 0.175, 0.26],
+    [0.7, 0.175, -0.26],
+    [0.7, 0.175, 0.26]
+  ];
+  legOffsets.forEach(pos => {
+    const leg = new THREE.Mesh(legGeom, goldMat);
+    leg.position.set(pos[0], pos[1], pos[2]);
+    leg.rotation.z = pos[0] > 0 ? -0.05 : 0.05;
+    leg.castShadow = true;
+    benchGroup.add(leg);
+  });
+
+  propsGroup.add(benchGroup);
+
+  // 2. VELVET STANCHION ROPE BARRIER (In front of Back Center frame to feel like a high-security museum exhibit)
+  const barrierGroup = new THREE.Group();
+  
+  const postGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 8);
+  const postBaseGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16);
+  const postTopGeom = new THREE.SphereGeometry(0.04, 16, 16);
+
+  const createPost = (x, z) => {
+    const post = new THREE.Group();
+    post.position.set(x, 0, z);
+
+    const base = new THREE.Mesh(postBaseGeom, goldMat);
+    base.position.y = 0.01;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    post.add(base);
+
+    const pole = new THREE.Mesh(postGeom, goldMat);
+    pole.position.y = 0.42;
+    pole.castShadow = true;
+    post.add(pole);
+
+    const topSphere = new THREE.Mesh(postTopGeom, goldMat);
+    topSphere.position.y = 0.84;
+    topSphere.castShadow = true;
+    post.add(topSphere);
+
+    return post;
+  };
+
+  const leftPost = createPost(-1.3, -4.8);
+  const rightPost = createPost(1.3, -4.8);
+  barrierGroup.add(leftPost);
+  barrierGroup.add(rightPost);
+
+  // Sagging velvet rope path
+  const ropeStart = new THREE.Vector3(-1.3, 0.78, -4.8);
+  const ropeEnd = new THREE.Vector3(1.3, 0.78, -4.8);
+  const ropeMid = new THREE.Vector3(0, 0.58, -4.8); // sag center
+
+  const curve = new THREE.QuadraticBezierCurve3(ropeStart, ropeMid, ropeEnd);
+  const ropeGeom = new THREE.TubeGeometry(curve, 32, 0.02, 8, false);
+  const rope = new THREE.Mesh(ropeGeom, velvetMat);
+  rope.castShadow = true;
+  barrierGroup.add(rope);
+
+  propsGroup.add(barrierGroup);
+
+  // 3. LUXURY CORNER PALMS (Gold planters in back corners)
+  const corners = [
+    [-3.7, -5.7],
+    [3.7, -5.7]
+  ];
+
+  corners.forEach(pos => {
+    const plantGroup = new THREE.Group();
+    plantGroup.position.set(pos[0], 0, pos[1]);
+
+    // Planter Pot
+    const potGeom = new THREE.CylinderGeometry(0.24, 0.18, 0.45, 16);
+    const pot = new THREE.Mesh(potGeom, goldMat);
+    pot.position.y = 0.225;
+    pot.castShadow = true;
+    pot.receiveShadow = true;
+    plantGroup.add(pot);
+
+    // Soil
+    const dirtGeom = new THREE.CylinderGeometry(0.23, 0.23, 0.02, 16);
+    const dirtMat = new THREE.MeshStandardMaterial({ color: 0x271a0c, roughness: 0.95 });
+    const dirt = new THREE.Mesh(dirtGeom, dirtMat);
+    dirt.position.y = 0.44;
+    plantGroup.add(dirt);
+
+    // Palm Leaves fronds
+    const leafCount = 12;
+    for (let i = 0; i < leafCount; i++) {
+      const leafAngle = (i / leafCount) * Math.PI * 2 + Math.random() * 0.2;
+      const leafLength = 0.7 + Math.random() * 0.4;
+      const leafHeight = 0.5 + Math.random() * 0.3;
+
+      const start = new THREE.Vector3(0, 0.43, 0);
+      const mid = new THREE.Vector3(
+        Math.cos(leafAngle) * (leafLength * 0.5),
+        0.43 + leafHeight,
+        Math.sin(leafAngle) * (leafLength * 0.5)
+      );
+      const end = new THREE.Vector3(
+        Math.cos(leafAngle) * leafLength,
+        0.43 + (leafHeight * 0.15),
+        Math.sin(leafAngle) * leafLength
+      );
+
+      const leafCurve = new THREE.QuadraticBezierCurve3(start, mid, end);
+      const frondGeom = new THREE.TubeGeometry(leafCurve, 20, 0.012, 6, false);
+      const frond = new THREE.Mesh(frondGeom, greenLeafMat);
+      frond.castShadow = true;
+      plantGroup.add(frond);
+    }
+
+    propsGroup.add(plantGroup);
+  });
+
+  scene.add(propsGroup);
 }
 
 // ADJUST FRAME SCALE TO MATCH IMAGE ASPECT RATIO
