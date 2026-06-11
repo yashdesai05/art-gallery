@@ -330,34 +330,71 @@ function loadAssets() {
   });
 }
 
+// CREATE PROCEDURAL WOOD GRAIN TEXTURE
+function createProceduralWoodTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Fill with a base warm brown
+  ctx.fillStyle = '#51321d'; // warm walnut wood base
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Add random organic grain lines
+  ctx.strokeStyle = '#321c0e'; // darker grain color
+  ctx.lineWidth = 1.8;
+
+  for (let y = -20; y < 530; y += 4) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    
+    for (let x = 0; x <= 512; x += 15) {
+      // Natural wood wave pattern
+      const wave = Math.sin(x * 0.012) * 12 + Math.cos(x * 0.008) * 6;
+      const noise = (Math.random() - 0.5) * 1.0;
+      ctx.lineTo(x, y + wave + noise);
+    }
+    
+    // Vary the opacity of grain line parts for realism
+    ctx.globalAlpha = 0.18 + Math.random() * 0.3;
+    ctx.stroke();
+  }
+
+  // Draw natural wood knots/eyes
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = '#221105';
+  for (let i = 0; i < 3; i++) {
+    const knotX = Math.random() * 512;
+    const knotY = Math.random() * 512;
+    const knotRadius = 20 + Math.random() * 30;
+    
+    for (let r = knotRadius; r > 3; r -= 3.5) {
+      ctx.beginPath();
+      ctx.ellipse(knotX, knotY, r, r * 0.6, Math.PI / 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(1.5, 3); // stretch vertically to simulate long wood planks
+  
+  return texture;
+}
+
 // SETUP MODEL PIECES & FRAME TEXTURES
 function setupModelObjects() {
   if (!modelScene) return;
 
   let leftDoorPanel = null;
+  const woodTexture = createProceduralWoodTexture();
 
   modelScene.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
       child.receiveShadow = true;
-
-      // Handle Floor material (reflective dark wood/concrete)
-      if (child.name === 'Floor') {
-        child.material = new THREE.MeshStandardMaterial({
-          color: 0xe2e4e9, // light elegant plaster/stone
-          roughness: 0.25,
-          metalness: 0.1
-        });
-      }
-
-      // Handle Walls material (elegant dark matte)
-      if (child.name.startsWith('Wall') || child.name.startsWith('Baseboard')) {
-        child.material = new THREE.MeshStandardMaterial({
-          color: 0xf7f7f9, // bright clean modern wall
-          roughness: 0.85,
-          metalness: 0.0
-        });
-      }
 
       // Handle Floor material (reflective parquetry wood)
       if (child.name === 'Floor') {
@@ -390,7 +427,7 @@ function setupModelObjects() {
       if (child.name.startsWith('Frame_') || child.name === 'Sculpture' || child.name.includes('Handle')) {
         if (child.name.startsWith('Frame_')) {
           child.material = new THREE.MeshStandardMaterial({
-            color: 0x3d2314, // Deep rich royal mahogany brown wood
+            map: woodTexture, // Apply realistic wood grain texture
             roughness: 0.55,
             metalness: 0.1
           });
