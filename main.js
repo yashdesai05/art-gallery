@@ -33,7 +33,8 @@ const state = {
   canvasTextures: {}, // filename -> Texture map
   targetProgress: 0,
   loadProgress: 0,
-  assetsLoaded: false
+  assetsLoaded: false,
+  spotlightColor: '#fffdf2'
 };
 
 // DOM ELEMENTS
@@ -158,6 +159,60 @@ function setupLights() {
   scene.add(entranceLightRight);
 }
 
+// CREATE PHYSICAL CEILING LAMP FIXTURE
+function createLampFixtureMesh(spotlightY) {
+  const lampGroup = new THREE.Group();
+
+  const metalMat = new THREE.MeshStandardMaterial({
+    color: 0x222224, // modern matte dark graphite
+    roughness: 0.35,
+    metalness: 0.8
+  });
+
+  // 1. Mounting base on the ceiling (ceiling Y is at 4.0)
+  const baseGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.02, 16);
+  const base = new THREE.Mesh(baseGeom, metalMat);
+  const ceilingYLocal = 4.0 - spotlightY;
+  base.position.y = ceilingYLocal;
+  lampGroup.add(base);
+
+  // 2. Dynamic vertical rod connecting to base
+  const rodLength = Math.max(0.1, ceilingYLocal - 0.05);
+  const rodGeom = new THREE.CylinderGeometry(0.015, 0.015, rodLength, 8);
+  const rod = new THREE.Mesh(rodGeom, metalMat);
+  rod.position.y = ceilingYLocal - (rodLength / 2);
+  lampGroup.add(rod);
+
+  // 3. Cylinder casing (representing the lamp bulb/head)
+  const headGroup = new THREE.Group();
+  headGroup.name = "headGroup";
+  
+  const casingGeom = new THREE.CylinderGeometry(0.06, 0.05, 0.16, 16);
+  const casing = new THREE.Mesh(casingGeom, metalMat);
+  casing.rotation.x = Math.PI / 2; // Orient along Z axis
+  headGroup.add(casing);
+
+  // 4. Glowing bulb/lens inside the casing (matching selected light color)
+  const lensGeom = new THREE.CylinderGeometry(0.055, 0.055, 0.01, 16);
+  const lensMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(state.spotlightColor) });
+  const lens = new THREE.Mesh(lensGeom, lensMat);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.z = 0.075; // Front opening
+  headGroup.add(lens);
+
+  lampGroup.add(headGroup);
+
+  // Prevent the lamp fixture from casting shadows on the artwork it illuminates
+  lampGroup.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = false;
+      child.receiveShadow = true;
+    }
+  });
+
+  return lampGroup;
+}
+
 // SETUP DYNAMIC ARTWORK LIGHTS
 function addSpotlightToFrame(canvasMesh, name) {
   // Remove existing spotlight if present
@@ -169,13 +224,7 @@ function addSpotlightToFrame(canvasMesh, name) {
   const center = new THREE.Vector3();
   canvasMesh.getWorldPosition(center);
 
-  // Determine direction facing away from frame
-  // Frame centers and normals:
-  // Back Wall (Z around -6.9): light should point towards -Z, start from -5.0
-  // Left Wall (X around -4.9): light should point towards -X, start from -3.5
-  // Right Wall (X around 4.9): light should point towards +X, start from 3.5
-
-  const spot = new THREE.SpotLight(0xfffdf2, 2.5, 5, Math.PI / 5, 0.4, 1);
+  const spot = new THREE.SpotLight(new THREE.Color(state.spotlightColor), 2.5, 5, Math.PI / 5, 0.4, 1);
   spot.name = 'spot_' + name;
   spot.castShadow = true;
   spot.shadow.mapSize.width = 512;
@@ -191,7 +240,39 @@ function addSpotlightToFrame(canvasMesh, name) {
   }
 
   spot.target = canvasMesh;
+
+  // Add physical lamp mesh to the spotlight
+  const lampMesh = createLampFixtureMesh(spot.position.y);
+  spot.add(lampMesh);
+
+  // Orient the headGroup of the lamp to look at the center of the canvas
+  const headGroup = lampMesh.getObjectByName("headGroup");
+  if (headGroup) {
+    headGroup.lookAt(center);
+  }
+
   spotlightGroup.add(spot);
+}
+
+// DYNAMICALLY CHANGE LIGHT COLOR
+function changeSpotlightColor(colorStr) {
+  state.spotlightColor = colorStr;
+
+  spotlightGroup.traverse((child) => {
+    if (child.isSpotLight) {
+      child.color.set(colorStr);
+
+      // Update the physical lens BasicMaterial color inside headGroup
+      const head = child.getObjectByName("headGroup");
+      if (head) {
+        head.traverse((lensChild) => {
+          if (lensChild.isMesh && lensChild.material.type === "MeshBasicMaterial") {
+            lensChild.material.color.set(colorStr);
+          }
+        });
+      }
+    }
+  });
 }
 
 // ASSET LOADING MANAGER
@@ -774,6 +855,19 @@ function setupUIEventListeners() {
   window.addEventListener('touchstart', onSwipeMouseDown, { passive: true });
   window.addEventListener('touchmove', onSwipeMouseMove, { passive: true });
   window.addEventListener('touchend', onSwipeMouseUp, { passive: true });
+
+  // Light color preset selectors
+  document.querySelectorAll('.light-color-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.dataset.color;
+      changeSpotlightColor(color);
+      
+      // Toggle active states on UI
+      document.querySelectorAll('.light-color-btn').forEach(b => {
+        b.classList.toggle('active', b === e.currentTarget);
+      });
+    });
+  });
 }
 
 // RIGHT-CLICK CONTEXT MENU ON FRAME
