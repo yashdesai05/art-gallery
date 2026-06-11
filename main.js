@@ -307,6 +307,17 @@ function setupModelObjects() {
     if (child.name.startsWith('Canvas_')) {
       frameCanvases[child.name] = child;
       
+      // Store original parent frame scale
+      const parentFrame = child.parent;
+      if (parentFrame && parentFrame.name.startsWith('Frame_')) {
+        if (!state.originalFrameScales) {
+          state.originalFrameScales = {};
+        }
+        if (!state.originalFrameScales[parentFrame.name]) {
+          state.originalFrameScales[parentFrame.name] = parentFrame.scale.clone();
+        }
+      }
+      
       // Find matching artwork
       const art = artworks.find(a => a.frame === child.name);
       if (art && state.canvasTextures[art.filename]) {
@@ -314,10 +325,8 @@ function setupModelObjects() {
       } else {
         // Default clean matte white if no artwork mapped
         child.material = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 });
+        addSpotlightToFrame(child, child.name);
       }
-
-      // Add spot lighting
-      addSpotlightToFrame(child, child.name);
     }
   });
 
@@ -333,6 +342,54 @@ function setupModelObjects() {
   buildCatalogUI();
 }
 
+// ADJUST FRAME SCALE TO MATCH IMAGE ASPECT RATIO
+function adjustFrameScaleToImage(canvasMesh, texture) {
+  const parentFrame = canvasMesh.parent;
+  if (!parentFrame || !parentFrame.name.startsWith('Frame_')) return;
+
+  if (!state.originalFrameScales) {
+    state.originalFrameScales = {};
+  }
+  
+  let originalScale = state.originalFrameScales[parentFrame.name];
+  if (!originalScale) {
+    originalScale = parentFrame.scale.clone();
+    state.originalFrameScales[parentFrame.name] = originalScale;
+  }
+
+  const imgWidth = texture.image.width;
+  const imgHeight = texture.image.height;
+  if (!imgWidth || !imgHeight) return;
+
+  const imageAspect = imgWidth / imgHeight;
+
+  // Canvas local scale x (width) and z (height)
+  const cx = canvasMesh.scale.x;
+  const cz = canvasMesh.scale.z;
+
+  // Original visual dimensions in the scene
+  const W_orig = originalScale.x * cx;
+  const H_orig = originalScale.y * cz;
+  const originalAspect = W_orig / H_orig;
+
+  let W_new, H_new;
+  if (imageAspect > originalAspect) {
+    // Image is wider than original visual ratio: fit to width, shrink height
+    W_new = W_orig;
+    H_new = W_orig / imageAspect;
+  } else {
+    // Image is taller or square relative to original visual ratio: fit to height, shrink width
+    H_new = H_orig;
+    W_new = H_orig * imageAspect;
+  }
+
+  // Calculate new parent scales
+  const sx_new = W_new / cx;
+  const sy_new = H_new / cz;
+
+  parentFrame.scale.set(sx_new, sy_new, originalScale.z);
+}
+
 // APPLY TEXTURE TO CANVAS WITH FIT SHIFT
 function applyTextureToCanvas(mesh, texture) {
   mesh.material = new THREE.MeshStandardMaterial({
@@ -342,6 +399,14 @@ function applyTextureToCanvas(mesh, texture) {
     side: THREE.FrontSide
   });
   mesh.material.map.needsUpdate = true;
+
+  // Adjust frame scale to match image aspect ratio
+  if (texture && texture.image) {
+    adjustFrameScaleToImage(mesh, texture);
+  }
+
+  // Update spotlight position for the new scale/center
+  addSpotlightToFrame(mesh, mesh.name);
 }
 
 // BUILD BOTTOM CATALOG DRAW & SWAP GRID
@@ -495,6 +560,18 @@ function swapActiveFrameArtwork(newArtworkId) {
     if (destinationFrame && frameCanvases[destinationFrame]) {
       applyTextureToCanvas(frameCanvases[destinationFrame], state.canvasTextures[oldArt.filename]);
     }
+  } else if (destinationFrame && frameCanvases[destinationFrame]) {
+    // If no old artwork moved to destinationFrame, clear destinationFrame
+    const destCanvas = frameCanvases[destinationFrame];
+    destCanvas.material = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.9 });
+    
+    // Reset scale of destination frame
+    const destParent = destCanvas.parent;
+    if (destParent && destParent.name.startsWith('Frame_') && state.originalFrameScales[destParent.name]) {
+      destParent.scale.copy(state.originalFrameScales[destParent.name]);
+    }
+    // Update spotlight
+    addSpotlightToFrame(destCanvas, destCanvas.name);
   }
 
   // 3. Map new artwork to current frame
