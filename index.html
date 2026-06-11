@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Art Gallery - Immersive 3D Experience</title>
+    
+    <!-- Google Fonts for Luxury & Modern Art Aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Background Ambient Glow -->
+    <div class="ambient-glow"></div>
+
+    <!-- Asset Loader Overlay -->
+    <div id="loader" class="overlay active">
+      <div class="loader-content">
+        <!-- Palette Loader Icon & Splashes -->
+        <div class="palette-loader-container">
+          <div class="palette-icon-wrapper">
+            <!-- Background Gray Silhouette -->
+            <svg class="palette-svg bg-palette" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M421.3 125.4C379.7 75.3 318.5 48 256 48 141.1 48 48 141.1 48 256s93.1 208 208 208c42.1 0 79.4-20.2 103.4-51.5 9.2-12 4.6-29.2-8.1-35.6-7.3-3.7-15.3-5.7-23.3-5.7-28.7 0-52-23.3-52-52 0-14.7 6.1-28.8 16.9-38.9 12-11.2 18.1-27.1 16.5-43.3-3.2-32.5 17-62.5 47.9-71.1 12.6-3.5 25.9 1.1 33.8 11.5z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="136" cy="200" r="28" fill="#e2e8f0" />
+              <circle cx="200" cy="144" r="28" fill="#e2e8f0" />
+              <circle cx="280" cy="144" r="28" fill="#e2e8f0" />
+              <circle cx="352" cy="208" r="28" fill="#e2e8f0" />
+              <circle cx="136" cy="312" r="28" fill="#e2e8f0" />
+              <circle cx="208" cy="368" r="28" fill="#e2e8f0" />
+              <path d="M296 336c0-17.7-14.3-32-32-32s-32 14.3-32 32 14.3 32 32 32 32-14.3 32-32z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="8"/>
+            </svg>
+            <!-- Foreground Colored Silhouette that fills up -->
+            <svg id="fg-palette" class="palette-svg fg-palette" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="clip-path: inset(100% 0px 0px 0px);">
+              <path d="M421.3 125.4C379.7 75.3 318.5 48 256 48 141.1 48 48 141.1 48 256s93.1 208 208 208c42.1 0 79.4-20.2 103.4-51.5 9.2-12 4.6-29.2-8.1-35.6-7.3-3.7-15.3-5.7-23.3-5.7-28.7 0-52-23.3-52-52 0-14.7 6.1-28.8 16.9-38.9 12-11.2 18.1-27.1 16.5-43.3-3.2-32.5 17-62.5 47.9-71.1 12.6-3.5 25.9 1.1 33.8 11.5z" fill="#e2b078" stroke="#4a2e16" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle class="paint-dot dot-red" cx="136" cy="200" r="28" fill="#ef4444" />
+              <circle class="paint-dot dot-orange" cx="200" cy="144" r="28" fill="#f97316" />
+              <circle class="paint-dot dot-yellow" cx="280" cy="144" r="28" fill="#eab308" />
+              <circle class="paint-dot dot-green" cx="352" cy="208" r="28" fill="#22c55e" />
+              <circle class="paint-dot dot-blue" cx="136" cy="312" r="28" fill="#3b82f6" />
+              <circle class="paint-dot dot-purple" cx="208" cy="368" r="28" fill="#a855f7" />
+              <path d="M296 336c0-17.7-14.3-32-32-32s-32 14.3-32 32 14.3 32 32 32 32-14.3 32-32z" fill="#ffffff" stroke="#4a2e16" stroke-width="8"/>
+            </svg>
+            <div class="splash-ring">
+              <div class="splash-blob blob-red"></div>
+              <div class="splash-blob blob-yellow"></div>
+              <div class="splash-blob blob-green"></div>
+              <div class="splash-blob blob-blue"></div>
+              <div class="splash-blob blob-purple"></div>
+            </div>
+          </div>
+        </div>
+        <h2 class="loader-title">ART GALLERY</h2>
+        <div class="loader-bar-container">
+          <div id="loader-bar" style="width: 0%"></div>
+        </div>
+        <p id="loader-status">Preparing the showroom...</p>
+      </div>
+    </div>
+
+    <!-- Entry Screen Overlay (Outside the Door) -->
+    <div id="entry-overlay" class="overlay hidden">
+      <button id="enter-btn" class="btn btn-primary">
+        <span class="btn-text">ENTER GALLERY</span>
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+      <div class="entry-hint">Drag to look around • Click Enter to open the doors</div>
+    </div>
+
+    <!-- Interactive Showroom UI (Fades in once inside) -->
+    <div id="gallery-ui" class="ui-container hidden">
+      <!-- Top Branding Panel -->
+      <header class="top-bar">
+        <div class="logo-area">
+          <span class="logo-dot"></span>
+          <h2 class="logo-text">ART GALLERY</h2>
+        </div>
+        <div class="nav-controls">
+          <button id="tour-btn" class="ui-btn secondary" title="Start guided tour">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Auto Tour</span>
+          </button>
+          <button id="reset-view-btn" class="ui-btn secondary" title="Recenter camera">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+            </svg>
+            <span>Center View</span>
+          </button>
+          <button id="exit-btn" class="ui-btn danger" title="Exit to outside">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path>
+            </svg>
+            <span>Exit</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Sidebar Info Card (For selected artwork/frame) -->
+      <aside id="info-panel" class="info-panel hidden">
+        <button id="close-info-btn" class="close-btn" title="Back to center">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        
+        <div class="info-content">
+          <span class="info-label" id="info-frame-id">FRAME #1</span>
+          <h3 class="info-title" id="info-title">Golden Moments</h3>
+          <p class="info-description" id="info-description">
+            A beautiful composition capturing emotions and visual details in this curated virtual gallery display.
+          </p>
+          
+          <div class="info-meta">
+            <div class="meta-item">
+              <span class="meta-label">Location</span>
+              <span class="meta-val" id="info-location">Back Wall</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Medium</span>
+              <span class="meta-val" id="info-medium">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Style</span>
+              <span class="meta-val" id="info-style">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Colors Used</span>
+              <span class="meta-val" id="info-colors">-</span>
+            </div>
+          </div>
+          <!-- Compact inline artwork switcher -->
+          <div class="panel-swap-section">
+            <span class="panel-swap-label">Change Artwork</span>
+            <div class="panel-swap-strip" id="panel-swap-strip">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- Right-click Context Menu for Swapping Artwork -->
+      <div id="frame-context-menu" class="frame-context-menu hidden">
+        <div class="ctx-header">
+          <span class="ctx-title">Switch Image on Frame</span>
+          <button id="ctx-close-btn" class="ctx-close">✕</button>
+        </div>
+        <div class="swap-grid" id="swap-grid">
+          <!-- Dynamically populated with all 10 thumbnails -->
+        </div>
+      </div>
+
+      <!-- Bottom Gallery Catalog Drawer -->
+      <footer class="bottom-drawer">
+        <div class="drawer-header">
+          <div class="drawer-title-area">
+            <span class="drawer-badge">10 Items</span>
+            <h4>ARTWORK CATALOG</h4>
+          </div>
+          <div class="drawer-hint">Click a frame in the showroom or select an artwork below to focus camera</div>
+        </div>
+        <div class="catalog-carousel" id="catalog-carousel">
+          <!-- Dynamically populated with 10 photos -->
+        </div>
+      </footer>
+    </div>
+
+    <!-- Floating Help Prompt (Fades out after interaction) -->
+    <div id="controls-help" class="controls-help hidden">
+      <div class="help-item">
+        <span class="help-key">Drag</span>
+        <span class="help-text">Rotate View</span>
+      </div>
+      <div class="help-item">
+        <span class="help-key">Scroll</span>
+        <span class="help-text">Zoom</span>
+      </div>
+      <div class="help-item">
+        <span class="help-key">Click Frame</span>
+        <span class="help-text">Inspect Artwork</span>
+      </div>
+    </div>
+
+    <!-- Script Entry Point -->
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
